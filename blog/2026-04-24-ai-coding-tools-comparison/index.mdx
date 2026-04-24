@@ -1,0 +1,111 @@
+---
+slug: ai-coding-tools-comparison-2026
+title: 2026 主流 AI 编程工具横向对比
+description: 对比 Claude Code、Codex CLI、Cursor 和 GitHub Copilot 的使用场景、交互方式、价格和能力边界。
+keywords: [AI 编程, Claude Code, Codex CLI, Cursor, GitHub Copilot, AI IDE]
+image: /img/docusaurus-social-card.jpg
+authors: [annan]
+tags: [ai-share, ai, tools]
+hide_table_of_contents: false
+---
+
+Claude Code、Codex CLI、Cursor、GitHub Copilot——选哪个？本文从**使用场景、交互方式、费用、能力边界**四个维度做一次横向对比。
+
+{/* truncate */}
+
+## 一览表
+
+| | Claude Code | Codex CLI | Cursor (Pro) | Copilot Pro / Pro+ |
+|---|---|---|---|---|
+| 形态 | 终端 CLI | 终端 CLI | IDE（基于 VS Code）| IDE 插件 / 独立 IDE |
+| 底层模型 | Claude Opus / Sonnet | GPT-4o / o3 | 可选（默认 Claude Opus 4）| GPT-4o / Claude / Gemini |
+| 主要交互 | 对话 + 自主执行 | 对话 + 自主执行 | Chat / Composer / Tab 补全 | Chat / 内联补全 / Agent |
+| 上下文窗口 | 200K | 128K | 200K（取决于所选模型）| 64K–128K |
+| 联网 / 工具调用 | ✅ | ✅ | ✅ | ✅ Pro+ |
+| 月费（美元）| 按 token 计费（无订阅）| 按 token 计费 | $20 / $40 | $10 / $39 |
+
+---
+
+## Claude Code
+
+Anthropic 出品的终端 Agent，核心理念是**把整个代码库交给它，让它自主完成任务**。
+
+**优势**
+- 长上下文（200K）+ 强代码推理，适合跨文件重构、复杂 Bug 排查
+- 可直接读写文件、执行命令、调用 bash，真正"动手"而非只给建议
+- 与 Claude 模型同步更新，Opus 4 在复杂任务上表现突出
+
+**局限**
+- 纯终端，没有 GUI，上手门槛略高
+- 按 token 计费，长对话成本不可控
+- 国内访问需要代理
+
+---
+
+## Codex CLI
+
+OpenAI 推出的终端编程 Agent，与 Claude Code 定位相近，底层走 GPT-4o / o3。
+
+**优势**
+- 与 OpenAI 生态深度整合，配合 `o3` 在推理密集型任务（算法、数学）上有优势
+- 支持沙箱执行，安全性好
+- 开源，可自托管
+
+**局限**
+- 上下文窗口比 Claude Code 小
+- 国内同样需要代理
+- 生态成熟度略低于 Cursor/Copilot
+
+---
+
+## Cursor（Claude Opus 4）
+
+基于 VS Code 深度改造的 AI IDE，目前最受开发者欢迎的 AI 编程工具之一。
+
+**优势**
+- **Composer（Agent 模式）**：可跨多文件自动修改，是目前体验最流畅的 GUI Agent
+- **Tab 补全**：比 Copilot 更激进，能预测整段代码块
+- 可自由切换模型（GPT-4o、Claude Opus 4、Gemini 等），灵活性高
+- 熟悉 VS Code 的用户几乎零迁移成本
+
+**局限**
+- Pro+ 档（$40/月）才能充分释放 Opus 4 的额度，入门档有请求次数限制
+- 重度依赖云端，离线场景受限
+- 部分 VS Code 插件兼容性偶有问题
+
+---
+
+## GitHub Copilot（Pro / Pro+）
+
+微软 + OpenAI 出品，VS Code、JetBrains、Xcode 全系覆盖，企业渗透率最高。
+
+**Pro（$10/月）**
+- 内联补全体验成熟，日常编码提效明显
+- Chat 支持 GPT-4o，能回答代码问题、生成单测
+- 与 GitHub 工作流（PR、Issues）原生集成
+
+**Pro+（$39/月）**
+- 解锁 Agent 模式（多文件自动修改）+ 联网搜索
+- 可选 Claude Sonnet / Gemini 等多模型
+- 每月 1500 次高级模型请求
+
+**局限**
+- Agent 能力相比 Cursor Composer 仍稍逊一筹
+- 上下文窗口偏小，大型重构需要手动拆分任务
+- 订阅与 GitHub 账号绑定，灵活度低
+
+---
+
+## 如何选？
+
+**日常功能开发、团队协作** → **Copilot Pro**，生态最成熟，与 GitHub 无缝融合。
+
+**需要 Agent 帮你跨文件重构、自动写代码** → **Cursor Pro+（Opus 4）**，GUI 体验最好。
+
+**复杂架构设计、大规模代码库分析** → **Claude Code**，长上下文 + 强推理是核心优势。
+
+**算法竞赛、数学推导、研究型任务** → **Codex CLI（o3）**，推理模型在此类场景碾压其他选项。
+
+---
+
+> 这四个工具并不互斥。实际工程中常见的组合是：**Copilot 做日常补全 + Claude Code 做重型任务**，或者 **Cursor 作为主力 IDE + 偶尔用 Claude Code 处理复杂重构**。

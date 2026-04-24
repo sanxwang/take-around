@@ -1,0 +1,21 @@
+---
+slug: frontend-review-checklist
+title: 前端代码评审清单
+authors: [annan]
+tags: [code-share, react]
+date: 2024-11-18
+hide_table_of_contents: false
+---
+
+代码评审最怕两种情况：只看风格，不看行为；或者问题太散，最后谁都记不住。
+
+{/* truncate */}
+
+我自己做前端 review 时，会优先看四件事：
+
+- 有没有行为回归
+- 状态流是不是清晰
+- 边界条件有没有处理
+- 命名和拆分是否真的降低理解成本
+
+样式和格式当然也看，但通常不会放在最前面。真正影响线上质量的，还是行为和边界。

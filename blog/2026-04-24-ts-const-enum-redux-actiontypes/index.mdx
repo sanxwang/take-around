@@ -1,0 +1,76 @@
+---
+slug: ts-const-enum-redux-actiontypes
+title: Redux Action Types：用 const enum 实现零运行时开销
+description: 介绍为什么在 TypeScript 和 Redux 项目中使用 const enum 定义 Action Types，更清晰也更接近零运行时开销。
+keywords: [TypeScript, Redux, const enum, Action Types, React]
+image: /img/docusaurus-social-card.jpg
+authors: [annan]
+tags: [code-share, typescript, react, redux]
+hide_table_of_contents: false
+---
+
+在 TypeScript + Redux 项目里，用 `enum` 管理 Action Type 已经比裸字符串好很多——但还有更好的方式：`const enum`。
+
+{/* truncate */}
+
+## 普通 enum 的编译产物
+
+```ts
+enum Color {
+  Red = "Red"
+}
+const color = Color.Red
+```
+
+编译后会生成一个**运行时映射对象**：
+
+```js
+var Color;
+(function (Color) {
+  Color["Red"] = "Red";
+})(Color || (Color = {}));
+const color = Color.Red; // 对象属性查找
+```
+
+## const enum：值在编译期直接内联
+
+只需加一个 `const`：
+
+```ts
+const enum Color {
+  Red = "Red"
+}
+const color = Color.Red
+```
+
+编译后枚举对象**彻底消失**：
+
+```js
+const color = "Red"
+```
+
+TypeScript 在编译阶段就把所有引用替换成了字面量，**零运行时开销，bundle 更小**，开发体验完全一致。
+
+## 在 Redux 中的用法
+
+```ts
+const enum ActionType {
+  Increment = 'COUNTER/INCREMENT',
+  Decrement = 'COUNTER/DECREMENT',
+}
+
+function reducer(state = 0, action: { type: ActionType }) {
+  switch (action.type) {
+    case ActionType.Increment: return state + 1
+    case ActionType.Decrement: return state - 1
+    default: return state
+  }
+}
+```
+
+编译后 `ActionType.Increment` 直接变成 `"COUNTER/INCREMENT"`，类型安全和自动补全一样都不少。
+
+## 注意事项
+
+- **无法运行时迭代**：没有运行时对象，`Object.values(ActionType)` 会报错
+- **开启 `isolatedModules` 时不可用**（Vite/esbuild 项目常见），此时回退普通 `enum` 即可

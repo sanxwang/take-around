@@ -1,23 +1,355 @@
-/**
- * CSS files with the .module.css suffix will be treated as CSS modules
- * and scoped locally.
- */
-
 .heroBanner {
-  padding: 4rem 0;
-  text-align: center;
   position: relative;
   overflow: hidden;
+  padding: 5rem 0 3rem;
+  background:
+    linear-gradient(180deg, rgba(255, 209, 102, 0.12), rgba(255, 209, 102, 0) 26%),
+    linear-gradient(135deg, #120f24 0%, #1f1a3d 55%, #251c49 100%);
+}
+
+.heroBanner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.heroShell,
+.sectionShell {
+  position: relative;
+  z-index: 1;
+}
+
+.heroShell {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 2.5rem;
+  align-items: center;
+}
+
+.heroCopy {
+  color: #fdfbf3;
+  font-family: 'Courier New', 'Monaco', monospace;
+}
+
+.kicker,
+.sectionKicker,
+.cardEyebrow,
+.postMeta,
+.ribbonText,
+.statBox dt {
+  margin: 0;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.kicker {
+  display: inline-block;
+  margin-bottom: 1rem;
+  padding: 0.45rem 0.7rem;
+  color: #1a1530;
+  background: #ffd166;
+  box-shadow: 8px 8px 0 rgba(0, 0, 0, 0.28);
+}
+
+.heroTitle {
+  margin: 0;
+  color: #fff8db;
+  font-size: clamp(3rem, 8vw, 5.8rem);
+  line-height: 0.96;
+  text-transform: uppercase;
+  text-shadow: 6px 6px 0 rgba(0, 0, 0, 0.32);
+}
+
+.heroSubtitle {
+  max-width: 38rem;
+  margin: 1.25rem 0 0;
+  color: #d9d2ff;
+  font-size: 1.08rem;
+  line-height: 1.8;
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.primaryButton,
+.secondaryButton {
+  border: 3px solid #0b0915 !important;
+  border-radius: 0 !important;
+  font-family: 'Courier New', 'Monaco', monospace;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  box-shadow: 8px 8px 0 rgba(0, 0, 0, 0.25);
+  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
+}
+
+.primaryButton {
+  color: #120f24 !important;
+  background: #f29b79 !important;
+}
+
+.secondaryButton {
+  color: #fff8db !important;
+  background: #2b2550 !important;
+}
+
+.primaryButton:hover,
+.secondaryButton:hover {
+  transform: translate(3px, 3px);
+  box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.25);
+}
+
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 2.25rem 0 0;
+}
+
+.statBox {
+  margin: 0;
+  padding: 1rem 1.1rem;
+  background: rgba(7, 6, 18, 0.58);
+  border: 2px solid rgba(255, 248, 219, 0.16);
+  box-shadow: 8px 8px 0 rgba(8, 7, 19, 0.45);
+}
+
+.statBox dt {
+  color: #ffd166;
+}
+
+.statBox dd {
+  margin: 0.55rem 0 0;
+  color: #f6f1da;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.heroArtWrap {
+  display: flex;
+  justify-content: center;
+}
+
+.heroFrame {
+  width: min(100%, 40rem);
+  padding: 1rem;
+  background: linear-gradient(180deg, #0b0915 0%, #1a1335 100%);
+  border: 4px solid #ffd166;
+  box-shadow: 18px 18px 0 rgba(7, 6, 18, 0.42);
+}
+
+.frameBar {
+  display: flex;
+  gap: 0.45rem;
+  margin-bottom: 0.9rem;
+}
+
+.frameBar span {
+  width: 14px;
+  height: 14px;
+  background: #f28482;
+}
+
+.frameBar span:nth-child(2) {
+  background: #ffd166;
+}
+
+.frameBar span:nth-child(3) {
+  background: #f29b79;
+}
+
+.heroArt {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+  border: 4px solid #1f183d;
+  background: #140f2c;
+}
+
+.mainContent {
+  background:
+    linear-gradient(180deg, #f8eecf 0%, #f5f2e8 14%, #f3efe2 100%);
+}
+
+.signalSection,
+.postsSection {
+  padding: 4.5rem 0;
+}
+
+.sectionHeading {
+  max-width: 46rem;
+  margin-bottom: 2rem;
+}
+
+.sectionHeadingRow {
+  display: flex;
+  gap: 1.5rem;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 2rem;
+}
+
+.sectionKicker {
+  color: #8a5a00;
+}
+
+.sectionTitle {
+  margin: 0.45rem 0 0;
+  color: #17112d;
+  font-size: clamp(1.9rem, 4vw, 3rem);
+  line-height: 1.1;
+  font-family: 'Courier New', 'Monaco', monospace;
+}
+
+.signalGrid,
+.postGrid {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.signalGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.signalCard,
+.postCard {
+  border: 3px solid #17112d;
+  border-radius: 0;
+  box-shadow: 10px 10px 0 rgba(23, 17, 45, 0.12);
+}
+
+.signalCard {
+  padding: 1.3rem;
+  background: #fff8db;
+}
+
+.cardEyebrow {
+  color: #c96b4b;
+}
+
+.cardTitle,
+.postTitle {
+  margin: 0.7rem 0 0;
+  color: #17112d;
+  font-family: 'Courier New', 'Monaco', monospace;
+}
+
+.cardBody,
+.postDescription {
+  margin: 0.8rem 0 0;
+  color: #433b54;
+  line-height: 1.75;
+}
+
+.ribbonSection {
+  border-top: 3px solid #17112d;
+  border-bottom: 3px solid #17112d;
+  background: #f29b79;
+  overflow: hidden;
+}
+
+.ribbonShell {
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.ribbonText {
+  color: #120f24;
+  white-space: nowrap;
+}
+
+.postGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.postCard {
+  display: block;
+  padding: 1.35rem;
+  color: inherit;
+  text-decoration: none !important;
+  background: #fff;
+  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
+}
+
+.postCard:hover {
+  transform: translate(4px, 4px);
+  box-shadow: 6px 6px 0 rgba(23, 17, 45, 0.16);
+  background: #fff6d6;
+}
+
+.postMeta {
+  color: #8a5a00;
+}
+
+.postAction,
+.inlineLink {
+  color: #c96b4b;
+  font-family: 'Courier New', 'Monaco', monospace;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.postAction {
+  display: inline-block;
+  margin-top: 1rem;
+}
+
+.inlineLink {
+  padding-bottom: 0.2rem;
+  border-bottom: 2px solid currentColor;
 }
 
 @media screen and (max-width: 996px) {
   .heroBanner {
-    padding: 2rem;
+    padding: 4rem 0 2.5rem;
+  }
+
+  .heroShell,
+  .signalGrid,
+  .postGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .sectionHeadingRow {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .statGrid {
+    grid-template-columns: 1fr;
   }
 }
 
-.buttons {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+@media screen and (max-width: 640px) {
+  .heroTitle {
+    font-size: 2.7rem;
+  }
+
+  .heroSubtitle {
+    font-size: 1rem;
+  }
+
+  .signalSection,
+  .postsSection {
+    padding: 3.25rem 0;
+  }
+
+  .heroFrame,
+  .signalCard,
+  .postCard,
+  .statBox {
+    box-shadow: 6px 6px 0 rgba(23, 17, 45, 0.14);
+  }
 }

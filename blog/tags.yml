@@ -1,3 +1,38 @@
+code-share:
+  label: Code 经验分享
+  permalink: /code-share
+  description: 编程经验、工程实践与代码技巧
+
+ai-share:
+  label: AI 知识共享
+  permalink: /ai-share
+  description: AI 编程工具、模型能力与使用心得
+
+ai:
+  label: AI
+  permalink: /ai
+  description: AI 相关文章
+
+tools:
+  label: Tools
+  permalink: /tools
+  description: 开发工具相关文章
+
+typescript:
+  label: TypeScript
+  permalink: /typescript
+  description: TypeScript 相关文章
+
+react:
+  label: React
+  permalink: /react
+  description: React 相关文章
+
+redux:
+  label: Redux
+  permalink: /redux
+  description: Redux 相关文章
+
 facebook:
   label: Facebook
   permalink: /facebook

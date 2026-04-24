@@ -10,9 +10,9 @@ import {themes as prismThemes} from 'prism-react-renderer';
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: 'Personal Blog',
-  tagline: 'A Personal Blog',
-  favicon: 'img/favicon.ico',
+  title: 'Take Around',
+  tagline: 'Code notes, tool reviews, and practical engineering writing.',
+  favicon: 'img/favicon-robot.svg',
 
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
   future: {
@@ -27,8 +27,8 @@ const config = {
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
-  organizationName: 'facebook', // Usually your GitHub org/user name.
-  projectName: 'docusaurus', // Usually your repo name.
+  organizationName: 'wangannan', // Usually your GitHub org/user name.
+  projectName: 'take-around', // Usually your repo name.
 
   onBrokenLinks: 'throw',
 
@@ -36,8 +36,8 @@ const config = {
   // useful metadata like html lang. For example, if your site is Chinese, you
   // may want to replace "en" with "zh-Hans".
   i18n: {
-    defaultLocale: 'en',
-    locales: ['en'],
+    defaultLocale: 'zh-Hans',
+    locales: ['zh-Hans'],
   },
 
   presets: [
@@ -47,28 +47,31 @@ const config = {
       ({
         docs: {
           sidebarPath: './sidebars.js',
-          // Please change this to your repo.
-          // Remove this to remove the "edit this page" links.
-          editUrl:
-            'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
         },
         blog: {
           showReadingTime: true,
+          blogSidebarCount: 'ALL',
+          blogSidebarTitle: 'All posts',
           feedOptions: {
             type: ['rss', 'atom'],
             xslt: true,
           },
-          // Please change this to your repo.
-          // Remove this to remove the "edit this page" links.
-          editUrl:
-            'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
           // Useful options to enforce blogging best practices
           onInlineTags: 'warn',
           onInlineAuthors: 'warn',
           onUntruncatedBlogPosts: 'warn',
+          // Enable table of contents
+          blogPostComponent: '@theme/BlogPostPage',
+          processBlogPosts: async (blogPosts) => {
+            return blogPosts;
+          },
         },
         theme: {
           customCss: './src/css/custom.css',
+        },
+        gtag: {
+          trackingID: 'G-ZQ3R4H5CEY',
+          anonymizeIP: true,
         },
       }),
     ],
@@ -77,61 +80,47 @@ const config = {
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
-      // Replace with your project's social card
-      image: 'img/docusaurus-social-card.jpg',
       colorMode: {
         respectPrefersColorScheme: true,
       },
+      blog: {
+        sidebar: {
+          groupByYear: true,
+        },
+      },
+      tableOfContents: {
+        minHeadingLevel: 2,
+        maxHeadingLevel: 4,
+      },
       navbar: {
-        title: 'Personal Blog',
+        title: 'Take Around',
         logo: {
-          alt: 'Personal Blog Logo',
+          alt: 'Take Around Logo',
           src: 'img/logo.svg',
         },
         items: [
           {to: '/blog', label: 'Blog', position: 'left'},
-          {
-            href: 'https://github.com/facebook/docusaurus',
-            label: 'GitHub',
-            position: 'right',
-          },
+          {to: '/ai-timeline', label: 'AI 发展史', position: 'left'},
         ],
       },
       footer: {
         style: 'dark',
         links: [
           {
-            title: 'Community',
-            items: [
-              {
-                label: 'Stack Overflow',
-                href: 'https://stackoverflow.com/questions/tagged/docusaurus',
-              },
-              {
-                label: 'Discord',
-                href: 'https://discordapp.com/invite/docusaurus',
-              },
-              {
-                label: 'X',
-                href: 'https://x.com/docusaurus',
-              },
-            ],
-          },
-          {
-            title: 'More',
+            title: '内容',
             items: [
               {
                 label: 'Blog',
                 to: '/blog',
               },
               {
-                label: 'GitHub',
-                href: 'https://github.com/facebook/docusaurus',
+                label: 'AI 发展史',
+                to: '/ai-timeline',
               },
             ],
           },
         ],
-        copyright: `Copyright © ${new Date().getFullYear()} Personal Blog. Built with Docusaurus.`,
+        copyright: `Copyright © ${new Date().getFullYear()} Take Around.`,
       },
       prism: {
         theme: prismThemes.github,
