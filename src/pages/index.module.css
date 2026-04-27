@@ -235,8 +235,16 @@
   background: #fff8db;
 }
 
+[data-theme='dark'] .signalCard {
+  background: #241d4d;
+}
+
 .cardEyebrow {
   color: #c96b4b;
+}
+
+[data-theme='dark'] .cardEyebrow {
+  color: #f29b79;
 }
 
 .cardTitle,
@@ -246,11 +254,21 @@
   font-family: 'Courier New', 'Monaco', monospace;
 }
 
+[data-theme='dark'] .cardTitle,
+[data-theme='dark'] .postTitle {
+  color: #fff8db;
+}
+
 .cardBody,
 .postDescription {
   margin: 0.8rem 0 0;
   color: #433b54;
   line-height: 1.75;
+}
+
+[data-theme='dark'] .cardBody,
+[data-theme='dark'] .postDescription {
+  color: #c9bfd8;
 }
 
 .ribbonSection {
@@ -285,8 +303,20 @@
 
 .postCard:hover {
   transform: translate(4px, 4px);
-  box-shadow: 6px 6px 0 rgba(23, 17, 45, 0.16);
+ 
+
+[data-theme='dark'] .postMeta {
+  color: #ffd166;
+} box-shadow: 6px 6px 0 rgba(23, 17, 45, 0.16);
   background: #fff6d6;
+}
+
+[data-theme='dark'] .postCard {
+  background: #1b1636;
+}
+
+[data-theme='dark'] .postCard:hover {
+  background: #241d4d;
 }
 
 .postMeta {
