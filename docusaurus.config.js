@@ -12,7 +12,7 @@ import {themes as prismThemes} from 'prism-react-renderer';
 const config = {
   title: 'Take Around',
   tagline: 'Code notes, tool reviews, and practical engineering writing.',
-  favicon: 'img/favicon-robot.svg',
+  favicon: 'img/logo.svg',
 
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
   future: {
@@ -81,7 +81,8 @@ const config = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       colorMode: {
-        respectPrefersColorScheme: true,
+        disableSwitch: true,
+        defaultMode: 'light',
       },
       blog: {
         sidebar: {
@@ -99,7 +100,7 @@ const config = {
           src: 'img/logo.svg',
         },
         items: [
-          {to: '/blog', label: 'Blog', position: 'left'},
+          {to: '/blog', label: '博客', position: 'left'},
           {to: '/ai-timeline', label: 'AI 发展史', position: 'left'},
         ],
       },

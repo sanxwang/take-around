@@ -91,6 +91,8 @@ textarea {
   border-bottom: 3px solid var(--site-pixel-border);
   box-shadow: 0 8px 0 var(--site-pixel-shadow);
   backdrop-filter: blur(10px);
+  position: relative;
+  z-index: 50;
 }
 
 .navbar__brand,
@@ -389,5 +391,24 @@ article.margin-vert--lg {
   .menu,
   .pagination-nav__link {
     box-shadow: 6px 6px 0 var(--site-pixel-shadow);
+  }
+
+  /* 修复移动端侧边栏层级问题 */
+  .theme-doc-sidebar-container,
+  .blog-sidebar {
+    position: relative;
+    z-index: 100;
+  }
+
+  .navbar-sidebar,
+  .navbar-sidebar__backdrop {
+    z-index: 200;
+    height: 100vh;
+  }
+
+  .menu {
+    border: none !important;
+    position: relative;
+    z-index: 10;
   }
 }

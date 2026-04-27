@@ -46,7 +46,7 @@ const lanes = [
 function SignalCard({title, body}) {
   return (
     <article className={styles.signalCard}>
-      <p className={styles.cardEyebrow}>Signal</p>
+      <p className={styles.cardEyebrow}>专注领域</p>
       <Heading as="h3" className={styles.cardTitle}>
         {title}
       </Heading>
@@ -63,7 +63,7 @@ function PostCard({title, description, to, meta}) {
         {title}
       </Heading>
       <p className={styles.postDescription}>{description}</p>
-      <span className={styles.postAction}>Read Post</span>
+      <span className={styles.postAction}>阅读全文 →</span>
     </Link>
   );
 }
@@ -74,7 +74,7 @@ function HomepageHeader() {
     <header className={clsx('hero hero--primary', styles.heroBanner)}>
       <div className={clsx('container', styles.heroShell)}>
         <div className={styles.heroCopy}>
-          <p className={styles.kicker}>TAKE AROUND // PIXEL LOG</p>
+          <p className={styles.kicker}>TAKE AROUND // DEV JOURNAL</p>
           <Heading as="h1" className={styles.heroTitle}>
             {siteConfig.title}
           </Heading>
@@ -130,9 +130,9 @@ export default function Home() {
         <section className={styles.signalSection}>
           <div className={clsx('container', styles.sectionShell)}>
             <div className={styles.sectionHeading}>
-              <p className={styles.sectionKicker}>Writing Lanes</p>
+              <p className={styles.sectionKicker}>核心内容</p>
               <Heading as="h2" className={styles.sectionTitle}>
-                首页不做模板展示，直接说明这里长期在写什么。
+                聚焦实践经验，长期输出三个方向的技术内容
               </Heading>
             </div>
             <div className={styles.signalGrid}>
@@ -146,7 +146,7 @@ export default function Home() {
         <section className={styles.ribbonSection}>
           <div className={clsx('container', styles.sectionShell, styles.ribbonShell)}>
             <p className={styles.ribbonText}>
-              RECENT THEMES // React architecture // AI coding agents // TypeScript edges // review heuristics
+              关键词 // React 架构设计 // AI 编程实践 // TypeScript 类型技巧 // 代码评审方法
             </p>
           </div>
         </section>
@@ -155,9 +155,9 @@ export default function Home() {
           <div className={clsx('container', styles.sectionShell)}>
             <div className={styles.sectionHeadingRow}>
               <div>
-                <p className={styles.sectionKicker}>Featured Posts</p>
+                <p className={styles.sectionKicker}>精选文章</p>
                 <Heading as="h2" className={styles.sectionTitle}>
-                  先看这些文章，能最快理解这个站点的写作密度。
+                  从这些文章开始，快速了解本站的写作风格和深度
                 </Heading>
               </div>
               <Link className={styles.inlineLink} to="/blog">
