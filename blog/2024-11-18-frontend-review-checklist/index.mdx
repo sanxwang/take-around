@@ -4,6 +4,8 @@ title: 前端代码评审清单
 tags: [code-share, react]
 date: 2024-11-18
 hide_table_of_contents: false
+toc_min_heading_level: 2
+toc_max_heading_level: 3
 ---
 
 代码评审最怕两种情况：只看风格，不看行为；或者问题太散，最后谁都记不住。
@@ -18,3 +20,512 @@ hide_table_of_contents: false
 - 命名和拆分是否真的降低理解成本
 
 样式和格式当然也看，但通常不会放在最前面。真正影响线上质量的，还是行为和边界。
+
+---
+
+## 1. 行为回归检查
+
+### ❌ 容易出问题的改动
+
+```javascript
+// 修改前：点击按钮触发提交
+function SubmitButton({ onSubmit }) {
+  return <button onClick={onSubmit}>提交</button>;
+}
+
+// 修改后：加了防抖，但改变了原有行为
+function SubmitButton({ onSubmit }) {
+  const debouncedSubmit = useMemo(
+    () => debounce(onSubmit, 500),
+    [] // ❌ 依赖丢失，onSubmit 变化时不会更新
+  );
+  
+  return <button onClick={debouncedSubmit}>提交</button>;
+}
+```
+
+**问题**：
+- 原来立即执行，现在有 500ms 延迟
+- 依赖数组为空，导致闭包陷阱
+- 用户快速点击时，只有最后一次生效
+
+### ✅ 正确的做法
+
+```javascript
+// 方案 1：明确告知这是行为变更，补充测试
+function SubmitButton({ onSubmit }) {
+  const debouncedSubmit = useMemo(
+    () => debounce(onSubmit, 500),
+    [onSubmit] // ✅ 依赖正确
+  );
+  
+  useEffect(() => {
+    return () => debouncedSubmit.cancel(); // ✅ 清理防抖
+  }, [debouncedSubmit]);
+  
+  return <button onClick={debouncedSubmit}>提交</button>;
+}
+
+// 方案 2：不改原有逻辑，在外层控制
+function FormContainer() {
+  const handleSubmit = useCallback(
+    debounce((data) => {
+      submitToServer(data);
+    }, 500),
+    []
+  );
+  
+  return <SubmitButton onSubmit={handleSubmit} />;
+}
+```
+
+**Review 要问的问题**：
+- 这个改动会影响现有交互吗？
+- 有没有对应的测试用例？
+- 边界情况（快速点击、组件卸载）处理了吗？
+
+---
+
+## 2. 状态流清晰度
+
+### ❌ 状态流混乱
+
+```javascript
+function UserProfile() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
+  // ❌ 状态更新分散，难以追踪
+  const handleSave = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await saveUser(user);
+      setUser(result);
+      setIsEditing(false);
+      setHasUnsavedChanges(false);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // ❌ 状态可能不一致：loading=true 但 error 还有值
+}
+```
+
+**问题**：
+- 5 个独立状态，组合爆炸（2^5 = 32 种状态）
+- 容易出现不合法状态：`loading=true` + `error="xxx"`
+- 状态更新散落各处，维护困难
+
+### ✅ 用状态机或 reducer 收敛
+
+```javascript
+// 方案 1：状态机（推荐）
+const STATES = {
+  IDLE: 'idle',
+  LOADING: 'loading',
+  EDITING: 'editing',
+  SAVING: 'saving',
+  ERROR: 'error'
+};
+
+function UserProfile() {
+  const [state, setState] = useState({
+    status: STATES.IDLE,
+    user: null,
+    error: null,
+    unsavedData: null
+  });
+  
+  const handleSave = async () => {
+    setState(s => ({ ...s, status: STATES.SAVING, error: null }));
+    
+    try {
+      const result = await saveUser(state.unsavedData);
+      setState({ 
+        status: STATES.IDLE, 
+        user: result, 
+        error: null,
+        unsavedData: null
+      });
+    } catch (e) {
+      setState(s => ({ 
+        ...s, 
+        status: STATES.ERROR, 
+        error: e.message 
+      }));
+    }
+  };
+  
+  // ✅ 状态清晰，不会出现 loading + error 的矛盾状态
+  const isLoading = state.status === STATES.LOADING || state.status === STATES.SAVING;
+  const canEdit = state.status === STATES.IDLE || state.status === STATES.EDITING;
+}
+```
+
+```javascript
+// 方案 2：useReducer
+function reducer(state, action) {
+  switch (action.type) {
+    case 'FETCH_START':
+      return { ...state, status: 'loading', error: null };
+    case 'FETCH_SUCCESS':
+      return { status: 'idle', user: action.payload, error: null };
+    case 'FETCH_ERROR':
+      return { ...state, status: 'error', error: action.error };
+    case 'START_EDIT':
+      return { ...state, status: 'editing', unsavedData: state.user };
+    default:
+      return state;
+  }
+}
+
+function UserProfile() {
+  const [state, dispatch] = useReducer(reducer, {
+    status: 'idle',
+    user: null,
+    error: null,
+    unsavedData: null
+  });
+  
+  // ✅ 所有状态变更都经过 reducer，易于追踪
+}
+```
+
+**Review 要问的问题**：
+- 这些状态会同时为真吗？
+- 有没有不合法的状态组合？
+- 状态更新逻辑是否集中？
+
+---
+
+## 3. 边界条件处理
+
+### ❌ 缺少边界处理
+
+```javascript
+function UserList({ users }) {
+  return (
+    <ul>
+      {users.map(user => ( // ❌ users 可能是 null/undefined
+        <li key={user.id}>{user.name}</li> // ❌ user.name 可能不存在
+      ))}
+    </ul>
+  );
+}
+
+function SearchInput({ onSearch }) {
+  const [query, setQuery] = useState('');
+  
+  const handleSearch = () => {
+    onSearch(query.trim()); // ❌ onSearch 可能是 undefined
+  };
+  
+  return (
+    <input 
+      value={query} 
+      onChange={(e) => setQuery(e.target.value)} // ❌ e.target.value 空格处理？
+    />
+  );
+}
+```
+
+### ✅ 完善的边界处理
+
+```javascript
+function UserList({ users = [] }) { // ✅ 默认值
+  if (!users.length) {
+    return <EmptyState />; // ✅ 空状态
+  }
+  
+  return (
+    <ul>
+      {users.map(user => (
+        <li key={user.id}>
+          {user.name || '匿名用户'} {/* ✅ 兜底文案 */}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function SearchInput({ onSearch = () => {} }) { // ✅ 默认空函数
+  const [query, setQuery] = useState('');
+  
+  const handleSearch = () => {
+    const trimmed = query.trim();
+    
+    if (!trimmed) { // ✅ 空值校验
+      return;
+    }
+    
+    if (trimmed.length > 100) { // ✅ 长度限制
+      showError('搜索词不能超过100字');
+      return;
+    }
+    
+    onSearch(trimmed);
+  };
+  
+  const handleChange = (e) => {
+    const value = e.target.value;
+    
+    // ✅ 防止粘贴大量空格
+    if (value.length - value.trim().length > 10) {
+      setQuery(value.trim());
+      return;
+    }
+    
+    setQuery(value);
+  };
+  
+  return (
+    <input 
+      value={query} 
+      onChange={handleChange}
+      maxLength={100} // ✅ 前端限制
+    />
+  );
+}
+```
+
+### 常见边界条件清单
+
+```javascript
+// ✅ 数据边界
+- 空数组：[]
+- null/undefined
+- 空字符串：""
+- 超长文本：>1000字符
+- 特殊字符：emoji、HTML标签
+
+// ✅ 交互边界
+- 快速连续点击
+- 网络慢/失败
+- 组件卸载时还有异步操作
+- 权限不足
+- 登录过期
+
+// ✅ 时间边界
+- 请求超时
+- Token 过期
+- 倒计时结束
+- 定时器清理
+```
+
+**Review 要问的问题**：
+- 数据为空时会怎样？
+- 用户快速操作会有问题吗？
+- 网络失败的错误提示在哪？
+
+---
+
+## 4. 命名和拆分
+
+### ❌ 难以理解的命名
+
+```javascript
+// ❌ 函数名不表意
+function handle() {
+  // 处理什么？
+}
+
+function process(data) {
+  // 处理成什么？
+}
+
+// ❌ 布尔值命名不清晰
+const flag = true; // 什么标志？
+const status = false; // status 不应该是布尔值
+const data = []; // 什么数据？
+
+// ❌ 缩写过度
+function calcUsrCntByDpt(d) {
+  // 谁能看懂？
+}
+```
+
+### ✅ 清晰的命名
+
+```javascript
+// ✅ 函数名清晰表达意图
+function handleSubmitButtonClick() {
+  // 一看就知道是提交按钮点击
+}
+
+function transformUserDataToTableRows(users) {
+  // 输入输出都很明确
+}
+
+// ✅ 布尔值用 is/has/should 开头
+const isLoading = true;
+const hasError = false;
+const shouldShowModal = true;
+
+// ✅ 数组/对象名称体现内容
+const userList = [];
+const userIdToNameMap = {};
+const pendingOrderIds = new Set();
+
+// ✅ 不过度缩写
+function calculateUserCountByDepartment(department) {
+  // 多几个字符，但清晰很多
+}
+```
+
+### ❌ 函数过长，职责不清
+
+```javascript
+function UserProfile() {
+  const [user, setUser] = useState(null);
+  const [posts, setPosts] = useState([]);
+  const [comments, setComments] = useState([]);
+  
+  useEffect(() => {
+    // ❌ 一个 useEffect 做了太多事
+    fetch('/api/user')
+      .then(res => res.json())
+      .then(data => {
+        setUser(data);
+        return fetch(`/api/posts?userId=${data.id}`);
+      })
+      .then(res => res.json())
+      .then(posts => {
+        setPosts(posts);
+        return Promise.all(
+          posts.map(p => fetch(`/api/comments?postId=${p.id}`))
+        );
+      })
+      .then(responses => Promise.all(responses.map(r => r.json())))
+      .then(comments => setComments(comments.flat()));
+  }, []);
+  
+  // ❌ 渲染逻辑和数据处理混在一起
+  return (
+    <div>
+      <h1>{user?.name}</h1>
+      {posts.map(post => (
+        <div key={post.id}>
+          <h2>{post.title}</h2>
+          <p>{post.content.substring(0, 100)}...</p>
+          {comments
+            .filter(c => c.postId === post.id)
+            .map(comment => (
+              <div key={comment.id}>{comment.text}</div>
+            ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+### ✅ 职责清晰的拆分
+
+```javascript
+// ✅ 数据获取逻辑抽离
+function useUserProfile(userId) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    fetchUser(userId).then(setUser).finally(() => setLoading(false));
+  }, [userId]);
+  
+  return { user, loading };
+}
+
+function useUserPosts(userId) {
+  const [posts, setPosts] = useState([]);
+  
+  useEffect(() => {
+    if (!userId) return;
+    fetchPosts(userId).then(setPosts);
+  }, [userId]);
+  
+  return posts;
+}
+
+// ✅ 组件拆分，职责单一
+function PostItem({ post, comments }) {
+  const postComments = comments.filter(c => c.postId === post.id);
+  
+  return (
+    <article>
+      <h2>{post.title}</h2>
+      <p>{post.content.substring(0, 100)}...</p>
+      <CommentList comments={postComments} />
+    </article>
+  );
+}
+
+function UserProfile({ userId }) {
+  const { user, loading } = useUserProfile(userId);
+  const posts = useUserPosts(user?.id);
+  const comments = useComments(posts);
+  
+  if (loading) return <Spinner />;
+  if (!user) return <NotFound />;
+  
+  return (
+    <div>
+      <UserHeader user={user} />
+      <PostList posts={posts} comments={comments} />
+    </div>
+  );
+}
+```
+
+**Review 要问的问题**：
+- 这个函数名能让人知道它做什么吗？
+- 这个函数是否做了多件事？
+- 能否拆成更小的、可复用的部分？
+
+---
+
+## 快速 Review 检查表
+
+打印出来，贴在显示器旁边：
+
+### 行为检查
+- [ ] 改动是否影响现有功能？
+- [ ] 有对应的测试用例吗？
+- [ ] 异步操作有取消/清理吗？
+
+### 状态检查
+- [ ] 状态是否有不合法的组合？
+- [ ] 状态更新逻辑是否集中？
+- [ ] 派生状态能否用计算属性替代？
+
+### 边界检查
+- [ ] 数据为空时会怎样？
+- [ ] 网络失败有错误提示吗？
+- [ ] 用户快速操作会出问题吗？
+- [ ] 有长度/大小限制吗？
+
+### 命名检查
+- [ ] 函数名能表达意图吗？
+- [ ] 布尔值有 is/has 前缀吗？
+- [ ] 有过度缩写吗？
+- [ ] 函数是否只做一件事？
+
+---
+
+## 总结
+
+代码评审的核心不是挑刺，而是**降低线上风险**。
+
+优先级：**行为 > 边界 > 状态 > 命名 > 格式**
+
+记住三个问题：
+1. 这段代码在什么情况下会出错？
+2. 三个月后的自己能看懂吗？
+3. 出了问题能快速定位吗？
+
+格式问题交给 ESLint 和 Prettier，把精力放在真正影响质量的地方。

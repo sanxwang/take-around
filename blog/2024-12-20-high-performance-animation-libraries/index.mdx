@@ -1,0 +1,544 @@
+---
+slug: high-performance-animation-libraries
+title: 前端高性能动画库选型指南
+description: 对比 GSAP、Motion One、Lottie、Anime.js 等主流动画库，从性能、体积、API 三个维度给出实际选型建议。
+keywords: [前端动画, GSAP, Framer Motion, Lottie, Anime.js, Web Animation, React动画, Vue动画]
+tags: [frontend, react, vue, performance]
+date: 2024-12-20
+hide_table_of_contents: false
+---
+
+动画库选太重会拖累首屏，选太轻功能不够用，选了框架绑定的又难迁移。本文对比几个主流方案，给出**框架无关 + 高性能**的实际选型建议。
+
+{/* truncate */}
+
+## 核心诉求
+
+选择动画库时，我优先看三件事：
+
+1. **性能**：能否稳定跑 60fps，是否使用硬件加速
+2. **体积**：gzipped 后对首屏加载的影响
+3. **API 设计**：是否与 Vue/React 解耦，迁移成本如何
+
+框架绑定的库（如 `react-spring`）在项目切换时会成为负担，优先考虑框架无关方案。
+
+---
+
+## 方案对比
+
+| 库 | 性能 | 体积（gzipped） | 学习曲线 | 框架支持 | 适用场景 |
+|---|---|---|---|---|---|
+| **GSAP** | ⭐⭐⭐⭐⭐ | ~50KB | 中 | Vue/React/原生均可 | 复杂序列动画、时间轴控制 |
+| **Motion One** | ⭐⭐⭐⭐⭐ | ~5KB | 低 | Vue/React/原生均可 | 轻量通用场景 |
+| **Lottie** | ⭐⭐⭐⭐ | ~150KB | 低 | Vue/React 有封装 | AE 导出动画、设计师协作 |
+| **Anime.js** | ⭐⭐⭐⭐ | ~9KB | 低 | Vue/React/原生均可 | 中小型项目、SVG 动画 |
+| **Framer Motion** | ⭐⭐⭐⭐ | ~35KB | 中 | React only | React 项目的声明式动画 |
+
+---
+
+## 1. GSAP — 工业级动画引擎
+
+最成熟、性能最强的选择，完全框架无关。
+
+### 基础用法
+
+```javascript
+import gsap from 'gsap';
+
+// React
+function AnimatedBox() {
+  const boxRef = useRef(null);
+  
+  useEffect(() => {
+    gsap.to(boxRef.current, {
+      x: 200,
+      rotation: 360,
+      duration: 1,
+      ease: 'power2.out'
+    });
+  }, []);
+  
+  return <div ref={boxRef} className="box" />;
+}
+
+// Vue 3
+<script setup>
+import { ref, onMounted } from 'vue';
+import gsap from 'gsap';
+
+const box = ref(null);
+
+onMounted(() => {
+  gsap.to(box.value, {
+    x: 200,
+    rotation: 360,
+    duration: 1,
+    ease: 'power2.out'
+  });
+});
+</script>
+
+<template>
+  <div ref="box" class="box"></div>
+</template>
+```
+
+### 时间轴控制
+
+GSAP 最强大的是 Timeline，可以精确编排复杂序列：
+
+```javascript
+import { gsap } from 'gsap';
+
+const tl = gsap.timeline({ paused: true });
+
+tl.to('.box1', { x: 100, duration: 0.5 })
+  .to('.box2', { x: 100, duration: 0.5 }, '-=0.2') // 提前 0.2s 开始
+  .to('.box3', { x: 100, duration: 0.5 }, '+=0.3'); // 延迟 0.3s
+
+// 控制播放
+tl.play();
+tl.pause();
+tl.reverse();
+```
+
+### ScrollTrigger 插件
+
+滚动触发动画是常见需求，GSAP 的 ScrollTrigger 是目前最稳定的实现：
+
+```javascript
+import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+
+gsap.registerPlugin(ScrollTrigger);
+
+gsap.to('.element', {
+  scrollTrigger: {
+    trigger: '.container',
+    start: 'top center',
+    end: 'bottom center',
+    scrub: 1, // 平滑跟随滚动
+    markers: true // 开发时显示触发点
+  },
+  x: 500,
+  rotation: 360
+});
+```
+
+**何时选 GSAP**
+- 需要精确控制时间轴
+- 涉及滚动联动、拖拽交互
+- 团队已有 GSAP 经验
+- 项目规模大，动画复杂度高
+
+---
+
+## 2. Motion One — 新一代轻量选择
+
+基于 Web Animations API，性能接近原生，体积仅 ~5KB。
+
+### 基础用法
+
+```javascript
+import { animate, spring } from 'motion';
+
+// 最简单的调用
+animate('.box', { x: 100 }, { duration: 1 });
+
+// 使用物理弹簧曲线
+animate('.box', { scale: 1.2 }, { easing: spring() });
+
+// 序列动画
+animate('.box', 
+  { x: [0, 100, 200] },
+  { duration: 2, easing: 'ease-in-out' }
+);
+```
+
+### React 集成
+
+```javascript
+import { Motion } from '@motionone/solid'; // React 版本
+
+function App() {
+  return (
+    <Motion.div
+      animate={{ x: 100, rotate: 180 }}
+      transition={{ duration: 0.5 }}
+    >
+      Animated Box
+    </Motion.div>
+  );
+}
+```
+
+### Vue 集成（使用 @vueuse/motion）
+
+```vue
+<script setup>
+import { useMotion } from '@vueuse/motion';
+
+const target = ref(null);
+
+useMotion(target, {
+  initial: { opacity: 0, y: 100 },
+  enter: { opacity: 1, y: 0 }
+});
+</script>
+
+<template>
+  <div ref="target">淡入并上移</div>
+</template>
+```
+
+**何时选 Motion One**
+- 项目对包体积敏感
+- 只需要简单的过渡动画
+- 想用原生性能但不想写底层 API
+
+---
+
+## 3. Lottie — 设计师协作利器
+
+用于播放 After Effects 导出的 JSON 动画，适合设计驱动的项目。
+
+### React 用法
+
+```javascript
+import Lottie from 'lottie-react';
+import animationData from './loading-animation.json';
+
+function LoadingSpinner() {
+  return (
+    <Lottie
+      animationData={animationData}
+      loop={true}
+      autoplay={true}
+      style={{ width: 200, height: 200 }}
+    />
+  );
+}
+```
+
+### Vue 用法
+
+```vue
+<script setup>
+import LottieAnimation from 'lottie-vuejs/src/LottieAnimation.vue';
+import animationData from './loading-animation.json';
+</script>
+
+<template>
+  <LottieAnimation
+    :animationData="animationData"
+    :loop="true"
+    :autoPlay="true"
+    :width="200"
+    :height="200"
+  />
+</template>
+```
+
+### 控制播放
+
+```javascript
+import { useRef } from 'react';
+import Lottie from 'lottie-react';
+
+function ControlledAnimation() {
+  const lottieRef = useRef(null);
+  
+  return (
+    <>
+      <Lottie lottieRef={lottieRef} animationData={animationData} />
+      <button onClick={() => lottieRef.current.play()}>播放</button>
+      <button onClick={() => lottieRef.current.pause()}>暂停</button>
+      <button onClick={() => lottieRef.current.stop()}>停止</button>
+    </>
+  );
+}
+```
+
+**何时选 Lottie**
+- 设计师提供 AE 动画源文件
+- 需要像素级还原设计稿
+- 加载动画、图标动效等矢量场景
+- 多端（Web/iOS/Android）共用动画资源
+
+**注意事项**
+- 体积较大（核心库 ~150KB）
+- 复杂动画的 JSON 文件可能很大
+- 性能取决于动画复杂度，避免过多路径和效果
+
+---
+
+## 4. Anime.js — 轻量且优雅
+
+体积仅 ~9KB，API 设计简洁，适合中小型项目。
+
+### 基础用法
+
+```javascript
+import anime from 'animejs';
+
+// DOM 动画
+anime({
+  targets: '.box',
+  translateX: 250,
+  rotate: '1turn',
+  backgroundColor: '#FFC0CB',
+  duration: 800,
+  easing: 'easeInOutQuad'
+});
+
+// 时间线
+const timeline = anime.timeline({
+  easing: 'easeOutExpo',
+  duration: 750
+});
+
+timeline
+  .add({ targets: '.box1', translateX: 250 })
+  .add({ targets: '.box2', translateX: 250 }, '-=500')
+  .add({ targets: '.box3', translateX: 250 }, '-=500');
+```
+
+### SVG 路径动画
+
+```javascript
+anime({
+  targets: 'path',
+  strokeDashoffset: [anime.setDashoffset, 0],
+  easing: 'easeInOutSine',
+  duration: 1500,
+  loop: true
+});
+```
+
+### React/Vue 集成
+
+```javascript
+// React
+useEffect(() => {
+  anime({
+    targets: boxRef.current,
+    translateX: 250,
+    duration: 1000
+  });
+}, []);
+
+// Vue
+onMounted(() => {
+  anime({
+    targets: box.value,
+    translateX: 250,
+    duration: 1000
+  });
+});
+```
+
+**何时选 Anime.js**
+- 项目不需要复杂时间轴
+- 想要轻量但不想太简陋
+- SVG 动画占比较高
+- 团队对 API 设计有审美要求
+
+---
+
+## 5. Framer Motion — React 的声明式方案
+
+React 生态最流行的动画库，API 设计优雅，但框架绑定。
+
+### 基础动画
+
+```javascript
+import { motion } from 'framer-motion';
+
+function Box() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.5 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.5 }}
+    >
+      淡入放大
+    </motion.div>
+  );
+}
+```
+
+### 手势交互
+
+```javascript
+<motion.div
+  whileHover={{ scale: 1.1 }}
+  whileTap={{ scale: 0.9 }}
+  drag
+  dragConstraints={{ left: -100, right: 100 }}
+>
+  可拖拽的元素
+</motion.div>
+```
+
+### 布局动画（自动 FLIP）
+
+```javascript
+const [isExpanded, setIsExpanded] = useState(false);
+
+<motion.div layout onClick={() => setIsExpanded(!isExpanded)}>
+  {isExpanded ? <ExpandedContent /> : <CollapsedContent />}
+</motion.div>
+```
+
+**何时选 Framer Motion**
+- 项目确定长期使用 React
+- 需要手势交互（拖拽、滑动）
+- 想要自动布局动画（FLIP）
+- 团队偏好声明式 API
+
+**局限**
+- 只能用于 React，迁移成本高
+- 体积比纯 JS 库大（~35KB）
+- 复杂动画性能不如 GSAP
+
+---
+
+## 性能优化核心原则
+
+无论选哪个库，都要遵守以下规则才能达到 60fps：
+
+### 1. 只动画这 4 个属性
+
+```css
+/* ✅ 好：触发合成，GPU 加速 */
+transform: translateX(100px);
+transform: scale(1.2);
+transform: rotate(45deg);
+opacity: 0.5;
+
+/* ❌ 坏：触发重排/重绘 */
+left: 100px;
+width: 200px;
+margin-left: 50px;
+background-color: red; /* 会触发重绘 */
+```
+
+### 2. 使用 will-change 提前通知浏览器
+
+```css
+.animated-box {
+  will-change: transform, opacity;
+}
+```
+
+**注意**：不要滥用，动画结束后应移除 `will-change`。
+
+### 3. 避免布局抖动（Layout Thrashing）
+
+```javascript
+// ❌ 坏：频繁读写样式
+elements.forEach(el => {
+  const height = el.offsetHeight; // 读
+  el.style.height = height + 10 + 'px'; // 写
+});
+
+// ✅ 好：分离读写
+const heights = elements.map(el => el.offsetHeight); // 批量读
+elements.forEach((el, i) => {
+  el.style.height = heights[i] + 10 + 'px'; // 批量写
+});
+```
+
+### 4. 使用 requestAnimationFrame
+
+```javascript
+// ❌ 坏
+setInterval(() => {
+  element.style.left = position + 'px';
+}, 16);
+
+// ✅ 好
+function animate() {
+  element.style.transform = `translateX(${position}px)`;
+  requestAnimationFrame(animate);
+}
+requestAnimationFrame(animate);
+```
+
+---
+
+## 实际选型决策树
+
+```
+需要复杂时间轴控制或滚动联动？
+├─ 是 → GSAP
+└─ 否
+   ├─ 设计师提供 AE 动画？
+   │  └─ 是 → Lottie
+   └─ 否
+      ├─ 项目对体积极度敏感？
+      │  └─ 是 → Motion One
+      └─ 否
+         ├─ 只用 React 且需要手势/布局动画？
+         │  └─ 是 → Framer Motion
+         └─ 否 → Anime.js
+```
+
+---
+
+## 我的实际使用经验
+
+### 中后台系统（React/Vue）
+- **基础过渡**：CSS Transition + `@vueuse/motion` 或 `framer-motion`
+- **数据可视化**：GSAP（精确控制图表动画时序）
+- **加载动画**：Lottie（设计师提供统一资源）
+
+### 营销活动页
+- **主视觉动画**：GSAP + ScrollTrigger（滚动视差效果）
+- **小交互**：Anime.js（体积敏感场景）
+- **SVG 动效**：Anime.js 或 GSAP
+
+### 组件库
+- **内部使用**：Motion One（轻量 + 框架无关）
+- **对外暴露**：提供 render prop，由使用方决定动画库
+
+---
+
+## 常见误区
+
+### 误区 1：用动画库就一定快
+
+❌ **错误示例**
+```javascript
+// 即使用 GSAP，动画错误的属性依然会卡
+gsap.to('.box', { width: 500, marginLeft: 100 });
+```
+
+✅ **正确做法**
+```javascript
+gsap.to('.box', { scaleX: 2, x: 100 });
+```
+
+### 误区 2：CSS 动画一定比 JS 快
+
+实际上：
+- **简单过渡**：CSS 更省事，性能相当
+- **复杂序列/交互**：GSAP 等库优化更好，且可控性强
+- **动态数值计算**：JS 动画更灵活
+
+### 误区 3：体积小就是好
+
+Anime.js 9KB vs GSAP 50KB，但如果需要复杂时间轴，自己实现的代码可能超过 50KB 且 Bug 一堆。
+
+---
+
+## 总结
+
+- **默认选择**：Motion One（轻量 + 框架无关 + 性能好）
+- **复杂项目**：GSAP（工业级稳定性 + 生态成熟）
+- **设计协作**：Lottie（像素级还原 + 多端共用）
+- **React 深度绑定**：Framer Motion（声明式 + 手势支持）
+
+核心原则：**优先用 transform/opacity，优先选框架无关方案，优先测试真机性能**。
+
+动画库只是工具，真正决定性能的是你选择动画哪些属性。

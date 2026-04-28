@@ -341,7 +341,7 @@ article.margin-vert--lg {
   max-width: 100% !important;
 }
 
-.row {
+/* .row {
   margin-left: 0 !important;
   margin-right: 0 !important;
 }
@@ -362,7 +362,7 @@ article.margin-vert--lg {
   flex: 1 1 calc(100% - 300px);
   max-width: calc(100% - 300px);
 }
-
+ */
 .theme-doc-toc-desktop,
 .col.col--3 {
   display: block !important;

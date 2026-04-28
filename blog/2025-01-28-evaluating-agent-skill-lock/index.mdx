@@ -1,0 +1,883 @@
+---
+slug: evaluating-agent-skill-lock
+title: 如何判断 Agent 是否被 Skill 锁死
+description: 用四个可量化指标检测 Skill 设计问题：使用熵、无效调用率、回溯深度、编辑成功率。深入分析 Tool、Skill、Policy 三层架构的本质区别。
+keywords: [AI Agent, Skill Evaluation, Agent Metrics, Policy Design, LLM Architecture]
+tags: [ai-share, engineering, architecture]
+date: 2025-01-28
+hide_table_of_contents: false
+toc_min_heading_level: 2
+toc_max_heading_level: 3
+---
+
+[上一篇文章](/blog/agent-skill-boundaries)讲了什么是好的 Skill 设计。这篇讲更难的问题：**如何判断一个 Agent 是否被 Skill 锁死了**？
+
+{/* truncate */}
+
+目前没有行业标准工具，但可以用**行为指标**检测。本文给出四个可量化指标 + 一个本质性的架构分析。
+
+---
+
+## 为什么需要评估指标
+
+### 一个真实场景
+
+你接手了一个 Coding Agent 项目，文档里写：
+
+```yaml
+skills:
+  - analyzeCodeQuality
+  - detectBugs
+  - suggestRefactor
+  - optimizePerformance
+  - generateTests
+  - reviewPR
+  ...（还有 15 个）
+```
+
+看起来很强大。但实际使用发现：
+- AI 总是按固定套路执行
+- 修改代码经常出错
+- 需要人工反复介入
+
+**问题出在哪？**
+
+仅从 Skill 列表看不出来。需要看**运行时行为**。
+
+---
+
+## 指标 1：Skill 使用熵（Entropy）
+
+衡量 Agent 是否在"创造性使用工具"还是"执行固定脚本"。
+
+### 什么是熵
+
+信息论中的概念，衡量不确定性：
+
+```
+熵 = -Σ(p(skill_i) * log(p(skill_i)))
+```
+
+- **低熵**：总用固定几个 skill → 被 workflow 锁死
+- **高熵**：各种 skill 都用，组合多样 → 决策灵活
+
+### 计算示例
+
+#### 案例 A：低熵（被锁死）
+
+某 Agent 100 次调用的分布：
+
+| Skill | 调用次数 | 概率 p | p * log(p) |
+|-------|---------|--------|-----------|
+| `read` | 85 | 0.85 | -0.138 |
+| `search` | 10 | 0.10 | -0.100 |
+| `edit` | 5 | 0.05 | -0.065 |
+
+```
+熵 = -((-0.138) + (-0.100) + (-0.065)) 
+   = 0.303
+```
+
+**解读**：几乎只在重复 `read`，决策单一。
+
+#### 案例 B：高熵（灵活）
+
+| Skill | 调用次数 | 概率 p | p * log(p) |
+|-------|---------|--------|-----------|
+| `read` | 30 | 0.30 | -0.155 |
+| `search` | 25 | 0.25 | -0.150 |
+| `edit` | 20 | 0.20 | -0.139 |
+| `run` | 15 | 0.15 | -0.122 |
+| `listFiles` | 10 | 0.10 | -0.100 |
+
+```
+熵 ≈ 0.666
+```
+
+**解读**：工具使用多样，根据情况调整策略。
+
+### 实践建议
+
+#### 收集数据
+
+```javascript
+// 记录每次 skill 调用
+const skillUsage = {
+  read: 85,
+  search: 10,
+  edit: 5
+};
+
+// 计算熵
+function calculateEntropy(usage) {
+  const total = Object.values(usage).reduce((a, b) => a + b, 0);
+  const probs = Object.values(usage).map(count => count / total);
+  
+  return -probs.reduce((sum, p) => {
+    return sum + (p > 0 ? p * Math.log2(p) : 0);
+  }, 0);
+}
+
+console.log(calculateEntropy(skillUsage)); // 输出熵值
+```
+
+#### 判断标准
+
+| 熵值范围 | 含义 | 可能原因 |
+|---------|------|---------|
+| \< 0.5 | 低熵，使用单一 | Workflow 固化 / Skill 设计不合理 |
+| 0.5 - 1.5 | 中等，基本合理 | 大部分场景 |
+| \> 1.5 | 高熵，使用分散 | 任务复杂 / 决策灵活 |
+
+**注意**：太高也不一定好（可能是乱调用）。关键看**任务完成质量**。
+
+---
+
+## 指标 2：无效调用率
+
+衡量 Skill 粒度是否合理、模型是否真的会用。
+
+### 什么是无效调用
+
+**定义**：调用了 Skill 但结果没被后续使用。
+
+#### 示例
+
+```
+1. AI 调用 readFile('utils.ts')     ← 调用
+2. AI 调用 readFile('config.ts')    ← 调用
+3. AI 调用 search('useState')       ← 调用
+4. AI 只修改了 config.ts
+   → utils.ts 没用上             ← 无效
+   → search 结果没用上           ← 无效
+```
+
+无效调用率 = 2/3 = 66.7%（太高了）
+
+### 如何检测
+
+#### 实现方式
+
+```javascript
+class SkillTracker {
+  constructor() {
+    this.calls = [];
+  }
+  
+  recordCall(skillName, result) {
+    this.calls.push({
+      skill: skillName,
+      result,
+      used: false,
+      timestamp: Date.now()
+    });
+    return this.calls.length - 1; // 返回 ID
+  }
+  
+  markUsed(callId) {
+    if (this.calls[callId]) {
+      this.calls[callId].used = true;
+    }
+  }
+  
+  getInvalidRate() {
+    const total = this.calls.length;
+    const unused = this.calls.filter(c => !c.used).length;
+    return unused / total;
+  }
+}
+```
+
+#### 判断逻辑
+
+当 AI 在后续步骤中引用了某次调用的结果，就标记为 `used`：
+
+```javascript
+// AI 调用
+const fileContentId = tracker.recordCall('readFile', content);
+
+// AI 在生成 edit 时提到了这个文件
+if (editContent.includes(content.slice(0, 50))) {
+  tracker.markUsed(fileContentId);
+}
+```
+
+### 分析案例
+
+#### 案例 A：粒度过细导致高无效率
+
+```yaml
+skills: [readLine, readBlock, readFunction, readClass, ...]
+```
+
+**问题**：模型不确定该用哪个，多次尝试
+
+```
+readLine(5)      → 不够
+readBlock(5-20)  → 还不够
+readFunction()   → 终于对了
+```
+
+前两次是无效调用，无效率 = 66%。
+
+#### 案例 B：合理粒度
+
+```yaml
+skills: [readFile]  # 支持 range 参数
+```
+
+```
+readFile('app.ts', { range: [1, 50] })  → 如果不够
+readFile('app.ts', { range: [1, 200] }) → 扩大范围
+```
+
+每次调用都有用（要么够用，要么为下次决策提供信息），无效率低。
+
+### 判断标准
+
+| 无效调用率 | 含义 | 建议 |
+|-----------|------|------|
+| \< 20% | 健康 | 保持 |
+| 20% - 40% | 中等 | 检查是否有冗余 Skill |
+| \> 40% | 偏高 | Skill 粒度不对 / 模型不会用 |
+
+---
+
+## 指标 3：回溯深度（Backtracking Depth）
+
+衡量 Agent 是"线性执行脚本"还是"探索式解决问题"。
+
+### 什么是回溯
+
+**定义**：发现问题后，返回上一步重新决策的次数。
+
+#### 线性执行（深度 0）
+
+```
+read → edit → done
+```
+
+一条路走到黑，没有验证和调整。
+
+#### 探索式执行（深度 2+）
+
+```
+read → edit → run 
+  ↓ 失败
+re-read → analyze → edit 
+  ↓ 失败
+search → read other files → edit
+  ↓ 成功
+done
+```
+
+经过 2 次回溯才成功。
+
+### 计算方式
+
+```javascript
+class BacktrackingTracker {
+  constructor() {
+    this.stack = [];
+    this.depth = 0;
+    this.maxDepth = 0;
+  }
+  
+  pushState(action) {
+    this.stack.push(action);
+  }
+  
+  backtrack() {
+    this.depth++;
+    this.maxDepth = Math.max(this.maxDepth, this.depth);
+    this.stack.pop(); // 回退一步
+  }
+  
+  success() {
+    // 任务完成，返回最大回溯深度
+    return this.maxDepth;
+  }
+}
+```
+
+### 真实案例
+
+#### 案例 A：被流程锁死（深度 0）
+
+某 Agent 修改 React 组件：
+
+```
+1. readFile('Button.tsx')
+2. edit (添加新 prop)
+3. done
+```
+
+**问题**：
+- 没读测试文件
+- 没 run test
+- 没验证类型
+- 无法发现错误 → **深度 0**
+
+#### 案例 B：真正的 Agent（深度 3）
+
+```
+1. readFile('Button.tsx')
+2. edit (添加新 prop)
+3. runTests()
+   → 失败：类型错误
+4. readFile('Button.types.ts')  ← 回溯 1
+5. edit (修正类型定义)
+6. runTests()
+   → 失败：测试用例挂了
+7. readFile('Button.test.tsx')  ← 回溯 2
+8. edit (更新测试)
+9. runTests()
+   → 失败：还有一个 edge case
+10. analyze error
+11. edit (处理 edge case)      ← 回溯 3
+12. runTests()
+    → 成功 ✅
+```
+
+**回溯深度 = 3**，说明 Agent 在真正解决问题。
+
+### 判断标准
+
+| 回溯深度 | 含义 | 可能原因 |
+|---------|------|---------|
+| 0 | 线性执行 | 被流程锁死 / 无反馈机制 |
+| 1-2 | 基本验证 | 有反馈但不够深入 |
+| 3+ | 探索式 | 真正的 Agent 行为 |
+
+**注意**：深度太高（\>10）可能说明任务太难或工具设计有问题。
+
+---
+
+## 指标 4：编辑成功率（First-time Success Rate）
+
+衡量 `edit` skill 的质量和上下文是否足够。
+
+### 定义
+
+**首次编辑成功率 = 一次 patch 就通过测试的比例**
+
+### 为什么重要
+
+这个指标最直接反映 Agent 的能力：
+
+- 成功率太高（\>90%）→ 任务可能太简单
+- 成功率太低（\<30%）→ `edit` skill 太弱或上下文不够
+- **健康区间**：50-70%
+
+### 计算方式
+
+```javascript
+class EditSuccessTracker {
+  constructor() {
+    this.attempts = [];
+  }
+  
+  recordEdit(editAction, testResult) {
+    this.attempts.push({
+      edit: editAction,
+      success: testResult.passed,
+      failureReason: testResult.error
+    });
+  }
+  
+  getFirstTimeSuccessRate() {
+    // 只看每个文件的第一次编辑
+    const firstAttempts = this.groupByFile()
+      .map(group => group[0]);
+    
+    const successes = firstAttempts.filter(a => a.success).length;
+    return successes / firstAttempts.length;
+  }
+  
+  groupByFile() {
+    // 按文件分组
+    const groups = {};
+    this.attempts.forEach(attempt => {
+      const file = attempt.edit.filePath;
+      if (!groups[file]) groups[file] = [];
+      groups[file].push(attempt);
+    });
+    return Object.values(groups);
+  }
+}
+```
+
+### 分析案例
+
+#### 案例 A：成功率过低（25%）
+
+```
+100 次编辑：
+- 首次成功：25 次
+- 需要 2 次：40 次
+- 需要 3+ 次：35 次
+```
+
+**可能原因**：
+1. `edit` 用的是 `overwriteFile`，容易丢代码
+2. 上下文不够（没读相关文件）
+3. 没有类型检查（TypeScript 项目）
+
+#### 案例 B：成功率健康（65%）
+
+```
+100 次编辑：
+- 首次成功：65 次
+- 需要 2 次：28 次
+- 需要 3+ 次：7 次
+```
+
+**说明**：
+- `edit` 质量好（可能用 diff-based）
+- 上下文采集充分
+- 有测试验证
+
+### 优化建议
+
+#### 如果成功率 < 40%
+
+**检查项**：
+- [ ] `edit` 是否 diff-based？
+- [ ] 是否有 TypeScript 类型信息？
+- [ ] 是否读取了相关依赖文件？
+- [ ] 是否有 lint/test 反馈？
+
+#### 如果成功率 > 85%
+
+**可能需要**：
+- [ ] 增加任务难度
+- [ ] 测试更复杂场景
+- [ ] 检查是否有挑战性
+
+---
+
+## 综合评估：四个指标的组合分析
+
+单看一个指标可能误判，组合分析更准确。
+
+### 健康的 Agent
+
+| 指标 | 数值 | 含义 |
+|------|------|------|
+| Skill 使用熵 | 0.8 - 1.2 | 工具使用灵活 |
+| 无效调用率 | 15% | 决策精准 |
+| 回溯深度 | 2 - 4 | 有反馈循环 |
+| 编辑成功率 | 60% | 能力足够但有挑战 |
+
+### 被锁死的 Agent
+
+| 指标 | 数值 | 含义 |
+|------|------|------|
+| Skill 使用熵 | 0.3 | 固定套路 |
+| 无效调用率 | 45% | 乱调用 |
+| 回溯深度 | 0 | 线性执行 |
+| 编辑成功率 | 30% | 质量差 |
+
+### 工具过度的 Agent
+
+| 指标 | 数值 | 含义 |
+|------|------|------|
+| Skill 使用熵 | 1.8 | 太分散 |
+| 无效调用率 | 55% | 不知道用哪个 |
+| 回溯深度 | 1 | 有反馈但不够 |
+| 编辑成功率 | 40% | 上下文混乱 |
+
+---
+
+## 本质区分：Tool vs Skill vs Policy
+
+很多讨论把这三个混在一起，导致方向跑偏。
+
+### 清晰定义
+
+| 层级 | 定义 | 职责 | 示例 |
+|------|------|------|------|
+| **Tool** | 底层能力 | 提供原子操作 | 文件系统、Shell、HTTP |
+| **Skill** | 对 Tool 的抽象 | 封装常用模式 | `readFile`、`applyPatch` |
+| **Policy** | 决策规则 | 什么时候用哪个 | "先读后写"、"失败重试" |
+
+### 关键洞察
+
+**真正限制模型的，往往不是 Skill，而是 Policy**。
+
+#### 示例
+
+同样的工具集：`readFile` + `edit` + `runTests`
+
+#### Policy A：硬编码（锁死）
+
+```yaml
+workflow:
+  1. read target file
+  2. edit
+  3. run tests once
+  4. if fail → report error to user
+```
+
+**问题**：失败后不会自己调整。
+
+#### Policy B：自适应（灵活）
+
+```yaml
+goal: make tests pass
+constraints:
+  - max iterations: 5
+  - must verify with runTests
+strategy: agent decides
+```
+
+**结果**：Agent 会循环 `read ↔ edit ↔ test` 直到成功。
+
+### 真实案例对比
+
+#### Claude Code
+
+- **Skill**：5 个核心（read, write, search, exec, browser）
+- **Policy**：模型自己决策，允许回溯
+- **特点**：Skill 少但好用，因为 Policy 灵活
+
+#### 某个失败的 Agent 项目
+
+- **Skill**：22 个（各种细分）
+- **Policy**：固定 7 步流程
+- **问题**：Skill 多但没用，因为 Policy 写死了
+
+### 为什么会混淆
+
+很多团队把 Policy 硬编码进 Skill 定义：
+
+```yaml
+# ❌ 这不是 Skill，是 Policy
+- name: fixBugWithTests
+  workflow:
+    1. analyze code
+    2. identify bug
+    3. generate fix
+    4. run tests
+    5. if fail, retry once
+```
+
+**正确做法**：
+
+```yaml
+# ✅ 只提供 Skill
+skills:
+  - readFile
+  - applyPatch
+  - runTests
+
+# Policy 由 Agent 自己决定
+# 或者明确写在系统 prompt，但不要硬编码进 Skill
+```
+
+---
+
+## 实际系统对比
+
+用上面的框架分析几个真实产品。
+
+### Claude Code
+
+| 维度 | 设计 | 评价 |
+|------|------|------|
+| **Tool** | 文件系统、Shell | ✅ 基础完备 |
+| **Skill** | 5 个核心 + 简洁 | ✅ 粗粒度、灵活 |
+| **Policy** | 模型主导，用户可干预 | ✅ 自适应 |
+
+**指标表现**（估计）：
+- Skill 使用熵：1.0+（工具使用平衡）
+- 回溯深度：2-5（会反复验证）
+- 编辑成功率：60-70%（diff-based）
+
+**特点**：**强调"安全编辑 + 可控修改"**，Policy 灵活。
+
+---
+
+### Cursor（Composer 模式）
+
+| 维度 | 设计 | 评价 |
+|------|------|------|
+| **Tool** | LSP、文件系统 | ✅ 完备 |
+| **Skill** | 中等（8-10 个） | ⚠️ 略多但可用 |
+| **Policy** | 半自动（用户触发验证） | ⚠️ 需要人工介入 |
+
+**指标表现**：
+- Skill 使用熵：0.6-0.9
+- 回溯深度：1-2（有验证但不够深）
+- 编辑成功率：55-65%
+
+**特点**：介于自动和手动之间，Policy 部分由用户控制。
+
+---
+
+### GitHub Copilot（传统模式）
+
+| 维度 | 设计 | 评价 |
+|------|------|------|
+| **Tool** | 几乎没有 | ❌ 无执行能力 |
+| **Skill** | 0（纯上下文） | N/A |
+| **Policy** | 无 | N/A |
+
+**指标表现**：
+- 不适用（不是 Agent）
+
+**特点**：**纯代码生成，无反馈循环**，所以指标不适用。
+
+**教训**：说明"没有执行能力"的局限性。
+
+---
+
+### 某个过度设计的内部 Agent
+
+| 维度 | 设计 | 评价 |
+|------|------|------|
+| **Tool** | 完备 | ✅ |
+| **Skill** | 25 个 | ❌ 太多 |
+| **Policy** | 硬编码 9 步流程 | ❌ 锁死 |
+
+**指标表现**：
+- Skill 使用熵：0.4（几乎只用固定几个）
+- 无效调用率：50%+（不知道用哪个）
+- 回溯深度：0（线性执行）
+- 编辑成功率：35%
+
+**问题**：Skill 堆砌 + Policy 固化 = 失败。
+
+---
+
+## 改进策略
+
+如果你的 Agent 指标不健康，按这个顺序优化：
+
+### 1. 先修 Policy，再改 Skill
+
+#### ❌ 错误思路
+
+"编辑成功率低 → 加更多 Skill"
+
+#### ✅ 正确思路
+
+"编辑成功率低 → 检查是否有反馈循环"
+
+```yaml
+# 先确保 Policy 允许回溯
+before:
+  read → edit → done
+
+after:
+  read → edit → test
+    ↓ fail
+  re-read → re-edit → test
+    ↓ success
+  done
+```
+
+---
+
+### 2. 合并冗余 Skill
+
+#### 识别方法
+
+看无效调用率高的 Skill：
+
+```javascript
+// 分析哪些 Skill 经常被调用但没用上
+const wastefulSkills = tracker.calls
+  .filter(c => !c.used)
+  .reduce((acc, c) => {
+    acc[c.skill] = (acc[c.skill] || 0) + 1;
+    return acc;
+  }, {});
+
+console.log(wastefulSkills);
+// { readLine: 45, readBlock: 38, readFunction: 12 }
+```
+
+#### 合并方案
+
+```yaml
+# before: 3 个细分 Skill
+- readLine
+- readBlock  
+- readFunction
+
+# after: 1 个灵活 Skill
+- readFile(path, options?: {
+    range?: [number, number],
+    symbolName?: string
+  })
+```
+
+---
+
+### 3. 加强反馈通道
+
+如果回溯深度 = 0，说明没有真实反馈。
+
+#### 必须加的 Skill
+
+```yaml
+verification:
+  - runTests
+  - runLint
+  - typeCheck
+  - build
+```
+
+#### 必须改的 Policy
+
+```yaml
+# before
+workflow:
+  - edit → done
+
+# after  
+workflow:
+  - edit → verify
+  - if fail → analyze error → retry
+  - if success → done
+```
+
+---
+
+### 4. 优化 edit Skill
+
+如果编辑成功率 < 40%，重点优化这个。
+
+#### 检查清单
+
+- [ ] 是否 diff-based？（不要 overwrite）
+- [ ] 是否有 preview？（让用户能看到）
+- [ ] 是否可回滚？（改错能撤销）
+- [ ] 上下文是否足够？（读了相关文件）
+
+---
+
+## 论文和理论支持
+
+如果想深入研究，可以参考这些方向：
+
+### ReAct（Reason + Act）
+
+**核心思想**：推理和行动要分离、交替进行
+
+```
+Thought: I need to check the test file
+Action: readFile('Button.test.tsx')
+Observation: Test expects prop 'variant'
+Thought: I should add 'variant' prop
+Action: edit(...)
+```
+
+**启示**：Policy 应该允许多次 Thought-Action 循环。
+
+---
+
+### Toolformer
+
+**核心思想**：模型学会"什么时候该用工具"
+
+**启示**：
+- 不要硬编码调用时机
+- 让模型自己判断是否需要工具
+- Skill 设计要支持"可选调用"
+
+---
+
+### Agent Loop 理论
+
+标准 Agent 循环：
+
+```
+Perceive → Decide → Act → Learn
+    ↑________________________↓
+```
+
+**启示**：
+- **Perceive**：read / search
+- **Decide**：模型推理（不是 Skill）
+- **Act**：edit / run
+- **Learn**：从 test 结果学习（回溯）
+
+**缺少任何一环，都不是完整 Agent**。
+
+---
+
+## 总结
+
+### 四个指标速查表
+
+| 指标 | 健康范围 | 检测什么 |
+|------|---------|---------|
+| Skill 使用熵 | 0.8 - 1.5 | 决策灵活性 |
+| 无效调用率 | \< 25% | Skill 粒度是否合理 |
+| 回溯深度 | 2 - 5 | 是否有反馈循环 |
+| 编辑成功率 | 50% - 70% | 工具质量和上下文 |
+
+### 核心洞察
+
+1. **Policy 比 Skill 更重要** — 同样的工具，不同策略，结果天差地别
+2. **少即是多** — Skill 少但灵活 > Skill 多但固化
+3. **反馈是关键** — 没有 run/test 就不是 Agent
+
+### 实践建议
+
+**第一步**：收集数据
+```javascript
+// 记录所有 Skill 调用
+// 记录编辑和测试结果
+// 记录决策路径
+```
+
+**第二步**：计算四个指标
+
+**第三步**：按优先级优化
+1. 回溯深度 = 0？ → 先加反馈循环
+2. 无效调用率 > 40%？ → 合并 Skill
+3. 编辑成功率 < 40%？ → 改 edit 实现
+4. Skill 使用熵 < 0.5？ → 检查 Policy
+
+### 最重要的原则
+
+> **不要堆砌 Skill，  
+> 要设计好 Policy，  
+> 然后让 Agent 自己决定怎么用工具。**
+
+---
+
+## 一个思考实验
+
+假设你要设计一个 Coding Agent，现在有两个方案：
+
+### 方案 A：丰富工具集
+
+- 30 个精心设计的 Skill
+- 固定的最佳实践流程
+- 每个步骤都有详细指导
+
+### 方案 B：最小工具集
+
+- 5 个核心 Skill（read / edit / run / search / list）
+- 没有固定流程
+- 只有目标和约束，策略自己决定
+
+**你会选哪个？**
+
+根据本文的分析，**方案 B 更可能成功**，因为：
+1. Skill 少 → 决策负担小
+2. 粗粒度 → 组合灵活
+3. Policy 自由 → 能适应各种场景
+
+**真正的能力不在工具数量，在决策质量**。
+
+---
+
+**系列回顾**：
+- [上一篇：Agent Skill 的边界](/blog/agent-skill-boundaries)
+
+如果你在设计或评估 Agent 系统，这两篇文章应该能提供一些实用的判断标准。欢迎讨论。
